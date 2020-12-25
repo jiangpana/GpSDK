@@ -1,4 +1,4 @@
-package com.rj.core
+package com.rj.gp
 
 import org.junit.Test
 

@@ -1,10 +1,9 @@
-package com.rj.core.gp.ad
+package com.rj.gp.ad
 
 import android.app.Activity
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
-import android.view.Gravity
 import android.widget.FrameLayout
 import com.google.android.gms.ads.*
 import com.google.android.gms.ads.reward.RewardItem
@@ -13,7 +12,7 @@ import com.google.android.gms.ads.reward.RewardedVideoAdListener
 import java.lang.ref.WeakReference
 
 /**
- * 包名:com.rj.core.gp.ad
+ * 包名:com.rj.core.ad
  */
 object GpAdHelper {
 
@@ -25,7 +24,7 @@ object GpAdHelper {
     private lateinit var mRewardedVideoAd: RewardedVideoAd
     private val mHandler = Handler(Looper.getMainLooper())
 
-    fun initGpAd(
+    fun init(
         context: Context,
         gpid: String,
         bannerId: String,
