@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.view.Gravity
 import android.widget.FrameLayout
 import com.google.android.gms.ads.*
 import com.google.android.gms.ads.reward.RewardItem
@@ -19,10 +20,11 @@ object GpAdHelper {
     private lateinit var mBannerId: String
     private lateinit var mInterstitialId: String
     private lateinit var mVideoId: String
-    private lateinit var mActivity: WeakReference<Context>
-    private lateinit var mInterstitialAd: InterstitialAd
-    private lateinit var mRewardedVideoAd: RewardedVideoAd
+    private lateinit var mContext: WeakReference<Context>
+    private  var mInterstitialAd: InterstitialAd?=null
+    private  var mRewardedVideoAd: RewardedVideoAd?=null
     private val mHandler = Handler(Looper.getMainLooper())
+
 
     fun init(
         context: Context,
@@ -33,7 +35,7 @@ object GpAdHelper {
         isTest: Boolean
     ) {
         mHandler.post {
-            mActivity = WeakReference(context)
+            mContext = WeakReference(context)
             MobileAds.initialize(context, gpid);
             mBannerId = bannerId
             mInterstitialId = interstitialId
@@ -44,93 +46,103 @@ object GpAdHelper {
                 mInterstitialId = "ca-app-pub-3940256099942544/1033173712"
                 mVideoId = "ca-app-pub-3940256099942544/5224354917"
             }
-            initGpAd()
+            loadInterstitialAd()
+            loadRewardedVideoAd()
         }
     }
 
 
-    private fun initGpAd() {
-        mActivity.get()?.let {
-            mInterstitialAd = InterstitialAd(it)
-            mInterstitialAd.apply {
-                adListener = newAdListenerInstance(true)
-                adUnitId = mInterstitialId
-            }
-            mRewardedVideoAd = MobileAds.getRewardedVideoAdInstance(it);
-            mRewardedVideoAd.rewardedVideoAdListener = mRewardedVideoAdListener;
-        }
-        loadInterstitialAd()
-        loadRewardedVideoAd()
-    }
 
+    @Synchronized
     private fun loadInterstitialAd() {
-        mHandler.post {
-            mInterstitialAd.loadAd(AdRequest.Builder().build())
-
+        mInterstitialAd?.apply {
+            if (isLoaded)return
         }
+        mInterstitialAd = InterstitialAd( mContext.get())
+        mInterstitialAd?.apply {
+            adListener = interstitialAdListener
+            adUnitId = mInterstitialId
+        }
+        mInterstitialAd?.loadAd(AdRequest.Builder().build())
     }
 
+    @Synchronized
     private fun loadRewardedVideoAd() {
-        mHandler.post {
-            mRewardedVideoAd.loadAd(
-                mVideoId,
-                AdRequest.Builder().build()
-            )
+        mRewardedVideoAd?.apply {
+            if (isLoaded){
+                return
+            }
         }
-
+        mRewardedVideoAd = MobileAds.getRewardedVideoAdInstance(mContext.get());
+        mRewardedVideoAd?.rewardedVideoAdListener = rewardedVideoAdListener
+        mRewardedVideoAd?.loadAd(
+            mVideoId,
+            AdRequest.Builder().build()
+        )
     }
 
     fun showGpInterstitialAd() {
-        mHandler.post {
-            if (mInterstitialAd.isLoaded) {
-                mInterstitialAd.show()
+        mInterstitialAd?.apply {
+            if (isLoaded) {
+                show()
             }
         }
-
-
     }
 
-    fun showRewardedVideoAd() {
-        mHandler.post {
-            if (mRewardedVideoAd.isLoaded) {
-                mRewardedVideoAd.show()
+    var rewardedAction :(()->Unit)?=null
+    fun showRewardedVideoAd(action:()->Unit) {
+        rewardedAction=action
+        mRewardedVideoAd?.apply {
+            if (isLoaded) {
+                show()
             }
         }
     }
 
     //Gravity.TOP or Gravity.BOTTOM
-    fun showBannerAd(activity: Activity, location: Int) {
+    @Synchronized
+    fun showBannerAd(activity: Activity, location: Int =Gravity.BOTTOM) {
+        val rootView = activity.findViewById<FrameLayout>(android.R.id.content);
+        if (rootView.tag ==activity.javaClass.simpleName) {
+            return
+        }
+        rootView.tag =activity.javaClass.simpleName
         mHandler.post {
-            val rootView = activity.findViewById<FrameLayout>(android.R.id.content);
-            if (rootView.findViewWithTag<AdView>(activity.javaClass.simpleName) != null) {
-                return@post
-            }
             val layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
             layoutParams.gravity = location
             AdView(activity).apply {
-                tag = activity.javaClass.simpleName
                 adUnitId = mBannerId
                 adSize = AdSize.SMART_BANNER;
-                adListener = newAdListenerInstance()
+                adListener = object : AdListener() {
+                    var flag=1
+                    override fun onAdFailedToLoad(p0: Int) {
+                        super.onAdFailedToLoad(p0)
+                        if (flag ==20)return
+                        mHandler.postDelayed({
+                            loadAd(AdRequest.Builder().build())
+                        }, ((flag++)*15*1000).toLong())
+                    }
+                }
                 loadAd(AdRequest.Builder().build())
                 rootView.addView(this, layoutParams)
             }
         }
     }
-
-    private fun newAdListenerInstance(isInterstitial: Boolean = false): AdListener {
-        return object : AdListener() {
-            private var i = 1
+    private var j = 1
+    private val interstitialAdListener: AdListener = object : AdListener() {
+            override fun onAdLoaded() {
+                super.onAdLoaded()
+                j=1
+            }
             override fun onAdFailedToLoad(p0: Int) {
                 super.onAdFailedToLoad(p0)
+                if (j==20)return
                 mHandler.postDelayed({
-                    if (isInterstitial) {
                         loadInterstitialAd()
-                    }
-                }, ((i++) * 15000).toLong())
+                }, ((j++) * 15*1000).toLong())
             }
 
             override fun onAdClosed() {
@@ -138,12 +150,17 @@ object GpAdHelper {
                 loadInterstitialAd()
             }
         }
-    }
 
 
-    private val mRewardedVideoAdListener = object : RewardedVideoAdListener {
-        private var i = 1
+
+
+    private var i = 1
+    private val rewardedVideoAdListener= object : RewardedVideoAdListener {
+        var rewarded =false
         override fun onRewardedVideoAdClosed() {
+            if (rewarded){
+                rewardedAction?.invoke()
+            }
             loadRewardedVideoAd()
         }
 
@@ -151,44 +168,49 @@ object GpAdHelper {
         }
 
         override fun onRewardedVideoAdLoaded() {
+            i = 1
         }
 
         override fun onRewardedVideoAdOpened() {
+            rewarded=false
         }
 
         override fun onRewardedVideoCompleted() {
         }
 
         override fun onRewarded(p0: RewardItem?) {
+            //奖励获得
+            rewarded=true
         }
 
         override fun onRewardedVideoStarted() {
         }
 
         override fun onRewardedVideoAdFailedToLoad(p0: Int) {
+            if (i == 20) return
             mHandler.postDelayed({
                 loadRewardedVideoAd()
-            }, ((i++) * 15000).toLong())
+            }, ((i++) * 15 * 1000).toLong())
         }
-
     }
+
 
     //******************* 在activity 生命周期回调 *******************//
     fun onPause() {
-        mActivity.get()?.apply {
-            mRewardedVideoAd.pause(this)
+        mContext.get()?.apply {
+            mRewardedVideoAd?.pause(this)
         }
     }
 
     fun onResume() {
-        mActivity.get()?.apply {
-            mRewardedVideoAd.resume(this)
+        mContext.get()?.apply {
+            mRewardedVideoAd?.resume(this)
         }
     }
 
     fun onDestroy() {
-        mActivity.get()?.apply {
-            mRewardedVideoAd.destroy(this)
+        mContext.get()?.apply {
+            mRewardedVideoAd?.destroy(this)
         }
     }
 }
