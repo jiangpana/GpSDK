@@ -27,7 +27,6 @@ object FaceBookAdHelper {
     fun init(
         context: Context, bannerId: String,
         interstitialId: String,
-        videoId: String,
         isTest: Boolean
     ) {
         mContext = WeakReference(context)
@@ -39,7 +38,7 @@ object FaceBookAdHelper {
             .initialize()
         mBannerId = bannerId
         mInterstitialId = interstitialId
-        mVideoId = videoId
+//        mVideoId = videoId
         if (isTest) {
             mBannerId = "IMG_16_9_APP_INSTALL#YOUR_PLACEMENT_ID"
             mInterstitialId = "YOUR_PLACEMENT_ID"

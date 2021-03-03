@@ -28,7 +28,6 @@ object GpAdHelper {
 
     fun init(
         context: Context,
-        gpid: String,
         bannerId: String,
         interstitialId: String,
         videoId: String,
@@ -36,7 +35,6 @@ object GpAdHelper {
     ) {
         mHandler.post {
             mContext = WeakReference(context)
-            MobileAds.initialize(context, gpid);
             mBannerId = bannerId
             mInterstitialId = interstitialId
             mVideoId = videoId
