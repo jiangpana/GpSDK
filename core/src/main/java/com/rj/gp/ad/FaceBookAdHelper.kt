@@ -38,7 +38,7 @@ object FaceBookAdHelper {
             .initialize()
         mBannerId = bannerId
         mInterstitialId = interstitialId
-//        mVideoId = videoId
+        mVideoId = ""
         if (isTest) {
             mBannerId = "IMG_16_9_APP_INSTALL#YOUR_PLACEMENT_ID"
             mInterstitialId = "YOUR_PLACEMENT_ID"
@@ -50,7 +50,7 @@ object FaceBookAdHelper {
     private fun initFaceBookAd() {
         //预加载广告
         loadInterstitialAd()
-        loadRewardedVideoAd()
+//        loadRewardedVideoAd()
     }
 
     //Gravity.TOP or Gravity.BOTTOM
