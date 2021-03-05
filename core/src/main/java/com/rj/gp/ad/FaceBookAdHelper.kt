@@ -5,9 +5,14 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
 import android.widget.FrameLayout
 import com.facebook.ads.*
 import com.facebook.ads.AdSize.BANNER_HEIGHT_50
+import com.rj.gp.SdkInitializer
+import com.rj.gp.constant.AdConfigConstant
+import com.rj.gp.ext.getManifestMetaData
 
 import java.lang.ref.WeakReference
 
@@ -16,34 +21,27 @@ object FaceBookAdHelper {
 
     private val mHandler = Handler(Looper.getMainLooper())
 
-    private lateinit var mBannerId: String
-    private lateinit var mInterstitialId: String
-    private lateinit var mVideoId: String
-    private lateinit var mContext: WeakReference<Context>
+    private val mBannerId by lazy {
+        val id = getManifestMetaData(AdConfigConstant.FACEBOOK_BANNER_ID_KEY)
+        if (id.isNotEmpty()) id else "IMG_16_9_APP_INSTALL#$id"
+    }
+    private val mInterstitialId by lazy {
+        val id = getManifestMetaData(AdConfigConstant.FACEBOOK_INTERSTITIAL_ID_KEY)
+        if (id.isNotEmpty()) id else "PLAYABLE#${id}"
+    }
+    private val mRewardedVideoId by lazy {
+        val id = getManifestMetaData(AdConfigConstant.FACEBOOK_REWARDEDVIDEO_ID_KEY)
+        if (id.isNotEmpty()) id else "ca-app-pub-3940256099942544/5224354917"
+    }
+    private val mContext by lazy {
+        SdkInitializer.sContext
+    }
     private var mInterstitialAd: InterstitialAd? = null
     private var mRewardedVideoAd: RewardedVideoAd? = null
     private var bannerAd: AdView? = null
 
     fun init(
-        context: Context, bannerId: String,
-        interstitialId: String,
-        isTest: Boolean
     ) {
-        mContext = WeakReference(context)
-        AudienceNetworkAds
-            .buildInitSettings(context)
-            .withInitListener {
-                System.out.println("FaceBook Ad 初始化完成...")
-            }
-            .initialize()
-        mBannerId = bannerId
-        mInterstitialId = interstitialId
-        mVideoId = ""
-        if (isTest) {
-            mBannerId = "IMG_16_9_APP_INSTALL#YOUR_PLACEMENT_ID"
-            mInterstitialId = "YOUR_PLACEMENT_ID"
-            mVideoId = "YOUR_PLACEMENT_ID"
-        }
         initFaceBookAd()
     }
 
@@ -56,6 +54,7 @@ object FaceBookAdHelper {
     //Gravity.TOP or Gravity.BOTTOM
     @Synchronized
     fun showBannerAd(activity: Activity, location: Int = Gravity.BOTTOM) {
+        bannerAd?.visibility = View.VISIBLE
         val rootView = activity.findViewById<FrameLayout>(android.R.id.content);
         if (rootView.tag == activity.javaClass.simpleName) {
             return
@@ -63,8 +62,8 @@ object FaceBookAdHelper {
         rootView.tag = activity.javaClass.simpleName
         mHandler.post {
             val layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
             )
             layoutParams.gravity = location
             AdView(
@@ -96,6 +95,52 @@ object FaceBookAdHelper {
     }
 
     @Synchronized
+    fun showBannerAd(activity: Activity, vp: ViewGroup, location: Int = Gravity.BOTTOM) {
+        bannerAd?.visibility = View.VISIBLE
+        val rootView = activity.findViewById<FrameLayout>(android.R.id.content);
+        if (rootView.tag == activity.javaClass.simpleName) {
+            return
+        }
+        rootView.tag = activity.javaClass.simpleName
+        mHandler.post {
+            val layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+            )
+            layoutParams.gravity = location
+            AdView(
+                activity,
+                mBannerId, BANNER_HEIGHT_50
+            ).apply {
+                setAdListener(object : com.facebook.ads.AdListener {
+                    var flag = 1
+                    override fun onAdClicked(p0: Ad?) {
+                    }
+
+                    override fun onError(p0: Ad?, p1: AdError?) {
+                        if (flag >= 20) return
+                        mHandler.postDelayed({ loadAd() }, ((flag++) * 15 * 1000).toLong())
+                    }
+
+                    override fun onAdLoaded(p0: Ad?) {
+                        flag = 1
+                    }
+
+                    override fun onLoggingImpression(p0: Ad?) {
+                    }
+                })
+                loadAd()
+                vp.addView(this, layoutParams)
+                bannerAd = this
+            }
+        }
+    }
+
+    fun dismissBanner() {
+        bannerAd?.visibility = View.GONE
+    }
+
+    @Synchronized
     private fun loadInterstitialAd() {
         mInterstitialAd?.apply {
             if (isAdLoaded && !isAdInvalidated) {
@@ -103,7 +148,7 @@ object FaceBookAdHelper {
             }
         }
         mInterstitialAd = InterstitialAd(
-            mContext.get(),
+            mContext,
             mInterstitialId
         );
         mInterstitialAd?.apply {
@@ -123,24 +168,37 @@ object FaceBookAdHelper {
         }
     }
 
+    fun isInterstitialAdReady(): Boolean {
+        mInterstitialAd?.apply {
+            if (isAdLoaded && !isAdInvalidated) {
+                return true
+            }
+        }
+        return false
+    }
+
     private var i = 1
     private val interstitialAdListener: InterstitialAdListener =
         object : InterstitialAdListener {
 
-            override fun onInterstitialDisplayed(p0: Ad?) =
+            override fun onInterstitialDisplayed(p0: Ad?) {
+                AdManager.showingInterstitialAd = true
                 System.out.println("Interstitial ad displayed.")
+            }
+
 
             override fun onAdClicked(p0: Ad?) {
                 System.out.println("onAdClicked");
             }
 
             override fun onInterstitialDismissed(p0: Ad?) {
+                AdManager.showingInterstitialAd = false
                 System.out.println("onInterstitialDismissed ");
                 loadInterstitialAd()
             }
 
             override fun onError(p0: Ad?, adError: AdError) {
-                System.out.println("onError  " + adError.getErrorMessage());
+                System.out.println("  " + adError.getErrorMessage());
                 if (i == 20) return
                 mHandler.postDelayed({
                     loadInterstitialAd()
@@ -165,9 +223,9 @@ object FaceBookAdHelper {
             }
         }
         mRewardedVideoAd = RewardedVideoAd(
-            mContext.get(),
-            mVideoId
-        );
+            mContext,
+            mRewardedVideoId
+        )
         mRewardedVideoAd?.apply {
             loadAd(
                 buildLoadAdConfig()
@@ -177,9 +235,9 @@ object FaceBookAdHelper {
         }
     }
 
-    var rewardedAction :(()->Unit)?=null
-    fun showFaceBookRewardedVideoAd(action:()->Unit) {
-        rewardedAction =action
+    var rewardedAction: (() -> Unit)? = null
+    fun showFaceBookRewardedVideoAd(action: () -> Unit) {
+        rewardedAction = action
         mRewardedVideoAd?.apply {
             if (isAdLoaded && !isAdInvalidated) {
                 show()
@@ -232,7 +290,7 @@ object FaceBookAdHelper {
         mRewardedVideoAd?.destroy()
     }
 
-    private val localJson ="{\n" +
+    private val localJson = "{\n" +
             "  \"show_interstitial_after_play\": 2,\n" +
             "  \"show_interstitial\": true,\n" +
             "  \"show_banner\": true,\n" +

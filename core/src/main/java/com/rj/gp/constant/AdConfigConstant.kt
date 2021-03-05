@@ -1,0 +1,17 @@
+package com.rj.gp.constant
+
+import com.rj.gp.ext.getManifestMetaData
+
+
+object AdConfigConstant {
+
+    const val ADMOB_APPLICATION_ID_KEY= "ADMOB_APPLICATION_ID"
+    const val ADMOB_BANNER_ID_KEY = "ADMOB_BANNER_ID"
+    const val ADMOB_INTERSTITIAL_ID_KEY = "ADMOB_INTERSTITIAL_ID"
+    const val ADMOB_REWARDEDVIDEO_ID_KEY = "ADMOB_REWARDEDVIDEO_ID"
+    const val ADMOB_OPENAD_ID_KEY = " ADMOB_OPENAD_ID"
+
+    const val FACEBOOK_BANNER_ID_KEY = "FACEBOOK_BANNER_ID"
+    const val FACEBOOK_INTERSTITIAL_ID_KEY = "FACEBOOK_INTERSTITIAL_ID"
+    const val FACEBOOK_REWARDEDVIDEO_ID_KEY = "FACEBOOK_REWARDEDVIDEO_ID"
+}
